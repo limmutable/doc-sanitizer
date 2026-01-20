@@ -1,0 +1,25 @@
+[project]
+name = "doc-sanitizer"
+version = "0.1.0"
+description = "Claude Code skill for updating and maintaining project documentation"
+readme = "README.md"
+authors = [
+    { name = "Jeffrey Lim", email = "jlim@prorata.vc" }
+]
+requires-python = ">=3.14"
+dependencies = []
+
+[project.scripts]
+doc-sanitizer = "doc_sanitizer:main"
+
+[build-system]
+requires = ["uv_build>=0.9.26,<0.10.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "mypy>=1.19.1",
+    "pre-commit>=4.5.1",
+    "pytest>=9.0.2",
+    "ruff>=0.14.13",
+]
