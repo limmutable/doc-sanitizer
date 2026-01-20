@@ -229,7 +229,7 @@ git diff --name-only HEAD~30..HEAD 2>/dev/null | grep -v "\.md$" | head -50
 git log --oneline --name-only --since="30 days ago" -- "*.md" | head -50
 
 # Docs that haven't been updated in 90+ days
-for f in $(find . -name "*.md" -not -path "./.git/*" | head -50); do
+find . -name "*.md" -not -path "./.git/*" -print0 2>/dev/null | head -z -n 50 | while IFS= read -r -d '' f; do
   last_commit=$(git log -1 --format="%ci" -- "$f" 2>/dev/null | cut -d' ' -f1)
   [ -n "$last_commit" ] && echo "$last_commit $f"
 done | sort | head -20
@@ -622,8 +622,8 @@ Run these checks after execution:
 
 ```bash
 # 1. Verify all internal links exist
-for f in $(find . -name "*.md" -not -path "./.git/*"); do
-  grep -oE '\]\([^)]+\.md[^)]*\)' "$f" 2>/dev/null | while read link; do
+find . -name "*.md" -not -path "./.git/*" -print0 2>/dev/null | while IFS= read -r -d '' f; do
+  grep -oE '\]\([^)]+\.md[^)]*\)' "$f" 2>/dev/null | while IFS= read -r link; do
     target=$(echo "$link" | sed 's/.*(\([^)#]*\).*/\1/')
     dir=$(dirname "$f")
     [ ! -f "$dir/$target" ] && [ ! -f "$target" ] && echo "BROKEN in $f: $target"
@@ -635,7 +635,7 @@ grep -rn "TODO\|FIXME\|XXX\|HACK" --include="*.md" . 2>/dev/null | head -10
 
 # 3. Verify images exist
 grep -roh '!\[[^\]]*\]([^)]*' --include="*.md" . 2>/dev/null | \
-  sed 's/.*](//' | while read img; do
+  sed 's/.*](//' | while IFS= read -r img; do
     [ ! -f "$img" ] && echo "MISSING IMAGE: $img"
   done
 ```
@@ -679,16 +679,13 @@ grep -roh '!\[[^\]]*\]([^)]*' --include="*.md" . 2>/dev/null | \
 Files not linked from anywhere:
 
 ```bash
-# Get all markdown files
-ALL_DOCS=$(find . -name "*.md" -not -path "./.git/*" -not -path "./node_modules/*")
-
 # Get all internal links
 ALL_LINKS=$(grep -roh '\]([^)]*\.md' --include="*.md" . 2>/dev/null | sed 's/\](//' | sort -u)
 
 # Find files not in any link (potential orphans)
-for doc in $ALL_DOCS; do
-  basename=$(basename "$doc")
-  if ! echo "$ALL_LINKS" | grep -q "$basename"; then
+find . -name "*.md" -not -path "./.git/*" -not -path "./node_modules/*" -print0 2>/dev/null | while IFS= read -r -d '' doc; do
+  docname=$(basename "$doc")
+  if ! echo "$ALL_LINKS" | grep -q "$docname"; then
     echo "ORPHANED: $doc"
   fi
 done
@@ -699,16 +696,14 @@ done
 Files referencing deleted code:
 
 ```bash
-# Get deleted files from recent history
-DELETED_FILES=$(git log --diff-filter=D --name-only --since="6 months ago" | grep -E "\.(js|ts|py|go|rs|java|rb)$" | sort -u)
-
-# Check if any docs reference these
-for deleted in $DELETED_FILES; do
-  filename=$(basename "$deleted" | sed 's/\.[^.]*$//')
-  grep -rl "$filename" --include="*.md" . 2>/dev/null | while read doc; do
-    echo "OBSOLETE: $doc references deleted file $deleted"
+# Get deleted files from recent history and check references
+git log --diff-filter=D --name-only --since="6 months ago" 2>/dev/null | \
+  grep -E "\.(js|ts|py|go|rs|java|rb)$" | sort -u | while IFS= read -r deleted; do
+    filename=$(basename "$deleted" | sed 's/\.[^.]*$//')
+    grep -rl "$filename" --include="*.md" . 2>/dev/null | while IFS= read -r doc; do
+      echo "OBSOLETE: $doc references deleted file $deleted"
+    done
   done
-done
 ```
 
 ### Step 3: Find Empty/Near-Empty Files
